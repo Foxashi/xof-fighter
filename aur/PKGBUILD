@@ -1,15 +1,15 @@
-# Maintainer: Your Name <you@example.com>
+# Maintainer: Foxashi <japfox29@gmail.com>
 pkgname=xof-fighter
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="Live Steam player counts for fighting games — CLI tool for Linux users"
 arch=('x86_64')
-url="https://github.com/YOURUSERNAME/xof-fighter"
+url="https://github.com/Foxashi/xof-fighter"
 license=('MIT')
 depends=()
-makedepends=('cargo' 'rust')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/YOURUSERNAME/$pkgname/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')  # Replace with actual hash: sha256sum xof-fighter-0.1.0.tar.gz
+makedepends=('cargo')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Foxashi/$pkgname/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')  # Run: sha256sum xof-fighter-0.1.0.tar.gz after publishing the GitHub release
 
 prepare() {
     cd "$pkgname-$pkgver"

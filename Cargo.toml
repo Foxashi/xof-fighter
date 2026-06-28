@@ -2,9 +2,9 @@
 name = "xof-fighter"
 version = "0.1.0"
 edition = "2024"
-description = "Live Steam player counts for fighting games — CLI tool for Linux users"
+description = "cli tool for checking player counts"
 license = "MIT"
-repository = "https://github.com/YOURUSERNAME/xof-fighter"
+repository = "https://github.com/Foxashi/xof-fighter"
 
 [dependencies]
 anyhow = "1.0.103"
