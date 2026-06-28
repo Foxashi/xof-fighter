@@ -1,0 +1,13 @@
+pkgbase = xof-fighter
+	pkgdesc = Live Steam player counts for fighting games — CLI tool for Linux users
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/YOURUSERNAME/xof-fighter
+	arch = x86_64
+	license = MIT
+	makedepends = cargo
+	makedepends = rust
+	source = xof-fighter-0.1.0.tar.gz::https://github.com/YOURUSERNAME/xof-fighter/archive/v0.1.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = xof-fighter
