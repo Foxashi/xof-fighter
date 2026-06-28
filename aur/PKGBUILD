@@ -9,7 +9,7 @@ license=('MIT')
 depends=()
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Foxashi/$pkgname/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')  # Run: sha256sum xof-fighter-0.1.0.tar.gz after publishing the GitHub release
+sha256sums=('4ed68bedd3d9840a444370e4cc0baaa9dc17f528004f956c6f5b9abe97e6791e')
 
 prepare() {
     cd "$pkgname-$pkgver"
