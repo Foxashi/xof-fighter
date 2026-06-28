@@ -6,24 +6,54 @@ Hello FGC!
 
 ### AUR (Arch Linux)
 
-With an AUR helper like `yay` or `paru`:
+Stable release (requires an account on aur.archlinux.org):
 
 ```bash
 yay -S xof-fighter
-```
-```bash
+# or
 paru -S xof-fighter
 ```
 
-Or manually:
+Latest git build:
 
 ```bash
-git clone https://aur.archlinux.org/xof-fighter.git
-cd xof-fighter
+yay -S xof-fighter-git
+# or
+paru -S xof-fighter-git
+```
+
+Or manually using the PKGBUILDs in this repo:
+
+```bash
+git clone https://github.com/Foxashi/xof-fighter.git
+cd xof-fighter/pkg/aur-git   # or pkg/aur for the stable release
 makepkg -si
 ```
 
 ### From source
+
+**Using Make (recommended — also used for updates):**
+
+```bash
+git clone https://github.com/Foxashi/xof-fighter.git
+cd xof-fighter
+sudo make install
+```
+
+To update later:
+
+```bash
+cd xof-fighter
+sudo make update
+```
+
+To uninstall:
+
+```bash
+sudo make uninstall
+```
+
+**Manually:**
 
 ```bash
 git clone https://github.com/Foxashi/xof-fighter.git
