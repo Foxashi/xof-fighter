@@ -1,6 +1,7 @@
 # xof-fighter
 
 Hello FGC!
+The purpose of this CLI tool is to make checking the player count of the most popular fighting games on Steam easier for Linux users.
 
 ## Install
 
