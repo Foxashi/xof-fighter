@@ -1,6 +1,6 @@
 # xof-fighter
 
-Live Steam player counts for fighting games — a CLI tool for Linux users in the FGC.
+Hello FGC!
 
 ## Install
 
