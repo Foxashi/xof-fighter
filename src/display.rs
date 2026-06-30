@@ -1,4 +1,5 @@
 use colored::Colorize;
+use serde::Serialize;
 use tabled::{
     builder::Builder,
     settings::{object::Columns, Alignment, Modify, Style},
@@ -98,6 +99,33 @@ fn format_number(n: u32) -> String {
         out.push(ch);
     }
     out.chars().rev().collect()
+}
+
+#[derive(Serialize)]
+struct JsonEntry {
+    rank: usize,
+    appid: u32,
+    name: String,
+    developer: String,
+    live_players: Option<u32>,
+    peak_ccu: u32,
+}
+
+pub fn print_json(games: Vec<crate::steamspy::SteamSpyGame>, live_counts: Vec<Option<u32>>) {
+    let entries: Vec<JsonEntry> = games
+        .into_iter()
+        .zip(live_counts)
+        .enumerate()
+        .map(|(i, (g, live))| JsonEntry {
+            rank: i + 1,
+            appid: g.appid,
+            name: g.name,
+            developer: g.developer,
+            live_players: live,
+            peak_ccu: g.ccu,
+        })
+        .collect();
+    println!("{}", serde_json::to_string_pretty(&entries).unwrap_or_default());
 }
 
 

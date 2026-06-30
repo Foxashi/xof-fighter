@@ -1,8 +1,35 @@
 use std::collections::HashSet;
 
-/// Static FG list because some games are not tagged properly
-// if you know a better way don't hesitate to open an issue
+/// Returns the set of allowed fighting game App IDs.
+/// If `~/.config/xof-fighter/games.txt` exists, it is used instead of the built-in list.
+/// The file format is one App ID per line; lines starting with `#` are treated as comments.
 pub fn allowed_ids() -> HashSet<u32> {
+    if let Some(ids) = load_user_config() {
+        if !ids.is_empty() {
+            return ids;
+        }
+    }
+    builtin_ids()
+}
+
+fn load_user_config() -> Option<HashSet<u32>> {
+    let home = std::env::var("HOME").ok()?;
+    let path = std::path::PathBuf::from(home)
+        .join(".config")
+        .join("xof-fighter")
+        .join("games.txt");
+    let content = std::fs::read_to_string(path).ok()?;
+    let ids = content
+        .lines()
+        .filter_map(|line| {
+            let line = line.split('#').next()?.trim();
+            if line.is_empty() { None } else { line.parse().ok() }
+        })
+        .collect();
+    Some(ids)
+}
+
+fn builtin_ids() -> HashSet<u32> {
     [
         // ── 3D Fighters ────────────────────────────────────────
         1778820, // Tekken 8
