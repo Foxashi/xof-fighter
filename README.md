@@ -5,62 +5,22 @@ The purpose of this CLI tool is to make checking the player count of the most po
 
 ## Install
 
-### AUR (Arch Linux)
-
-Stable release (requires an account on aur.archlinux.org):
-
-```bash
-yay -S xof-fighter
-# or
-paru -S xof-fighter
-```
-
-Latest git build:
-
-```bash
-yay -S xof-fighter-git
-# or
-paru -S xof-fighter-git
-```
-
-Or manually using the PKGBUILDs in this repo:
-
-```bash
-git clone https://github.com/Foxashi/xof-fighter.git
-cd xof-fighter/pkg/aur-git   # or pkg/aur for the stable release
-makepkg -si
-```
-
-### From source
-
-**Using Make (recommended — also used for updates):**
+Requires [Rust](https://rustup.rs/).
 
 ```bash
 git clone https://github.com/Foxashi/xof-fighter.git
 cd xof-fighter
-sudo make install
+cargo install --path .
 ```
 
-To update later:
+This installs the binary to `~/.cargo/bin/xof-fighter`. Make sure `~/.cargo/bin` is in your `PATH`.
+
+To update, pull the latest changes and reinstall:
 
 ```bash
 cd xof-fighter
-sudo make update
-```
-
-To uninstall:
-
-```bash
-sudo make uninstall
-```
-
-**Manually:**
-
-```bash
-git clone https://github.com/Foxashi/xof-fighter.git
-cd xof-fighter
-cargo build --release
-sudo install -Dm755 target/release/xof-fighter /usr/local/bin/xof-fighter
+git pull
+cargo install --path .
 ```
 
 ## Usage

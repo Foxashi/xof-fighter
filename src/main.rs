@@ -5,7 +5,11 @@ mod steamspy;
 
 use anyhow::Result;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Semaphore;
 
 #[derive(Parser)]
 #[command(
@@ -14,6 +18,7 @@ use reqwest::Client;
     about = "Steam player counts for fighting games — powered by SteamSpy"
 )]
 struct Cli {
+    /// Filter results by game name (case-insensitive substring match)
     #[arg(short, long, value_name = "NAME")]
     filter: Option<String>,
 
@@ -21,8 +26,13 @@ struct Cli {
     #[arg(short, long, value_name = "N")]
     top: Option<usize>,
 
+    /// Number of pages to fetch — each page contains ~100 games [default: 1]
     #[arg(short, long, value_name = "PAGES", default_value_t = 1)]
     pages: u8,
+
+    /// Show the App ID column
+    #[arg(long)]
+    appid: bool,
 }
 
 #[tokio::main]
@@ -31,9 +41,16 @@ async fn main() -> Result<()> {
 
     let client = Client::builder()
         .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+        .timeout(std::time::Duration::from_secs(10))
         .build()?;
 
-    println!("Fetching fighting games from SteamSpy (page 1–{})...\n", cli.pages);
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::with_template("{spinner:.cyan} {msg}")
+            .unwrap()
+    );
+    pb.enable_steady_tick(Duration::from_millis(80));
+    pb.set_message(format!("Fetching fighting games from SteamSpy (page 1–{})...", cli.pages));
 
     let allowed = games::allowed_ids();
     let mut games = steamspy::fetch_fighting_games(&client, cli.pages).await?;
@@ -46,6 +63,7 @@ async fn main() -> Result<()> {
     }
 
     if games.is_empty() {
+        pb.finish_and_clear();
         eprintln!("No games matched the given filters.");
         return Ok(());
     }
@@ -54,13 +72,18 @@ async fn main() -> Result<()> {
         games.truncate(n);
     }
 
-    println!("Fetching live player counts for {} games...\n", games.len());
+    pb.set_message(format!("Fetching live player counts for {} games...", games.len()));
 
+    let sem = Arc::new(Semaphore::new(8));
     let mut set = tokio::task::JoinSet::new();
     for (i, game) in games.iter().enumerate() {
         let client = client.clone();
         let app_id = game.appid;
-        set.spawn(async move { (i, steam::fetch_player_count(&client, app_id).await) });
+        let permit = Arc::clone(&sem);
+        set.spawn(async move {
+            let _permit = permit.acquire_owned().await;
+            (i, steam::fetch_player_count(&client, app_id).await)
+        });
     }
 
     let mut live: Vec<Option<u32>> = vec![None; games.len()];
@@ -70,8 +93,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    println!("Showing {} game(s)\n", games.len());
-    display::print_table(games, live);
+    pb.finish_and_clear();
+    display::print_table(games, live, cli.appid);
 
     Ok(())
 }

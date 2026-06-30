@@ -1,77 +1,77 @@
+use colored::Colorize;
 use tabled::{
+    builder::Builder,
     settings::{object::Columns, Alignment, Modify, Style},
-    Table, Tabled,
 };
 use terminal_size::{terminal_size, Width};
 
 use crate::steamspy::SteamSpyGame;
 
-/// Overhead in characters taken up by borders, padding, and fixed-width columns:
-///   7 borders (│) + 12 padding spaces (6 cols × 2) + fixed content: rank(3) + live(12) + ccu(8) + appid(7) = 49
-const FIXED_OVERHEAD: usize = 49;
 const MIN_NAME: usize = 20;
 const MIN_DEV: usize = 12;
 
-fn column_widths() -> (usize, usize) {
+fn column_widths(show_appid: bool) -> (usize, usize) {
     let term_w = terminal_size()
         .map(|(Width(w), _)| w as usize)
         .unwrap_or(120);
-    let available = term_w.saturating_sub(FIXED_OVERHEAD);
-    // name gets ~60 %, developer the remaining ~40 %
+    // overhead: borders + padding + fixed-width columns
+    // 5-col: 6 borders + 10 padding + rank(3) + live(12) + ccu(8) = 39
+    // 6-col: 7 borders + 12 padding + rank(3) + live(12) + ccu(8) + appid(7) = 49
+    let overhead = if show_appid { 49 } else { 39 };
+    let available = term_w.saturating_sub(overhead);
     let name = (available * 6 / 10).max(MIN_NAME);
     let dev  = (available * 4 / 10).max(MIN_DEV);
     (name, dev)
 }
 
-#[derive(Tabled)]
-struct Row {
-    #[tabled(rename = " # ")]
-    rank: String,
-    #[tabled(rename = "Game")]
-    name: String,
-    #[tabled(rename = "Live Players")]
-    live: String,
-    #[tabled(rename = "Peak CCU")]
-    ccu: String,
-    #[tabled(rename = "Developer")]
-    developer: String,
-    #[tabled(rename = "App ID")]
-    app_id: String,
+fn color_live(live: Option<u32>) -> String {
+    match live {
+        None              => "—".dimmed().to_string(),
+        Some(n) if n >= 1_000 => format_number(n).green().bold().to_string(),
+        Some(n) if n >= 100   => format_number(n).yellow().to_string(),
+        Some(n)               => format_number(n).dimmed().to_string(),
+    }
 }
 
-pub fn print_table(games: Vec<SteamSpyGame>, live_counts: Vec<Option<u32>>) {
+pub fn print_table(games: Vec<SteamSpyGame>, live_counts: Vec<Option<u32>>, show_appid: bool) {
     if games.is_empty() {
         println!("No results.");
         return;
     }
 
-    let (max_name, max_dev) = column_widths();
+    let (max_name, max_dev) = column_widths(show_appid);
+    let mut builder = Builder::default();
 
-    let rows: Vec<Row> = games
-        .iter()
-        .zip(live_counts.iter())
-        .enumerate()
-        .map(|(i, (g, &live))| Row {
-            rank: format!("{}", i + 1),
-            name: truncate(&g.name, max_name),
-            live: live.map(format_number).unwrap_or_else(|| "—".to_string()),
-            ccu: if g.ccu == 0 {
-                "—".to_string()
-            } else {
-                format_number(g.ccu)
-            },
-            developer: truncate(&g.developer, max_dev),
-            app_id: g.appid.to_string(),
-        })
-        .collect();
+    if show_appid {
+        builder.push_record([" # ", "Game", "Live Players", "Peak CCU", "Developer", "App ID"]);
+    } else {
+        builder.push_record([" # ", "Game", "Live Players", "Peak CCU", "Developer"]);
+    }
 
-    let mut table = Table::new(&rows);
+    for (i, (g, &live)) in games.iter().zip(live_counts.iter()).enumerate() {
+        let rank   = format!("{}", i + 1);
+        let name   = truncate(&g.name, max_name);
+        let live_s = color_live(live);
+        let ccu_s  = if g.ccu == 0 { "—".dimmed().to_string() } else { format_number(g.ccu) };
+        let dev    = truncate(&g.developer, max_dev);
+
+        if show_appid {
+            builder.push_record([rank, name, live_s, ccu_s, dev, g.appid.to_string()]);
+        } else {
+            builder.push_record([rank, name, live_s, ccu_s, dev]);
+        }
+    }
+
+    let mut table = builder.build();
     table
         .with(Style::modern())
         .with(Modify::new(Columns::single(0)).with(Alignment::right()))
         .with(Modify::new(Columns::single(2)).with(Alignment::right()))
-        .with(Modify::new(Columns::single(3)).with(Alignment::right()))
-        .with(Modify::new(Columns::single(5)).with(Alignment::right()));
+        .with(Modify::new(Columns::single(3)).with(Alignment::right()));
+
+    if show_appid {
+        table.with(Modify::new(Columns::single(5)).with(Alignment::right()));
+    }
 
     println!("{table}");
     println!(
@@ -99,5 +99,6 @@ fn format_number(n: u32) -> String {
     }
     out.chars().rev().collect()
 }
+
 
 
