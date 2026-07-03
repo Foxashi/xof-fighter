@@ -39,18 +39,21 @@ fn is_cache_fresh(path: &std::path::Path) -> bool {
 }
 
 /// Fetch games for the given SteamSpy tag, using a 12-hour disk cache.
-pub async fn fetch_fighting_games(client: &Client, pages: u8, tag: &str) -> Result<Vec<SteamSpyGame>> {
+/// Pass `refresh = true` to bypass the cache and always hit the API.
+pub async fn fetch_fighting_games(client: &Client, pages: u8, tag: &str, refresh: bool) -> Result<Vec<SteamSpyGame>> {
     let mut all: HashMap<String, SteamSpyGame> = HashMap::new();
 
     for page in 0..pages {
-        // Serve from cache when fresh
-        if let Some(path) = cache_path(tag, page) {
-            if is_cache_fresh(&path) {
-                if let Ok(data) = std::fs::read(&path) {
-                    if let Ok(chunk) = serde_json::from_slice::<HashMap<String, SteamSpyGame>>(&data) {
-                        if !chunk.is_empty() {
-                            all.extend(chunk);
-                            continue;
+        // Serve from cache when fresh (skipped when --refresh is given)
+        if !refresh {
+            if let Some(path) = cache_path(tag, page) {
+                if is_cache_fresh(&path) {
+                    if let Ok(data) = std::fs::read(&path) {
+                        if let Ok(chunk) = serde_json::from_slice::<HashMap<String, SteamSpyGame>>(&data) {
+                            if !chunk.is_empty() {
+                                all.extend(chunk);
+                                continue;
+                            }
                         }
                     }
                 }

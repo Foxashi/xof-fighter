@@ -34,6 +34,30 @@ fn color_live(live: Option<u32>) -> String {
     }
 }
 
+fn color_rank(rank: usize) -> String {
+    let s = rank.to_string();
+    match rank {
+        1 => s.yellow().bold().to_string(),
+        2 => s.white().bold().to_string(),
+        3 => s.truecolor(205, 127, 50).to_string(),
+        _ => s,
+    }
+}
+
+/// Returns a short publisher/studio tag derived from the developer name.
+fn publisher_tag(developer: &str) -> &'static str {
+    let d = developer.to_ascii_lowercase();
+    if d.contains("arc system")                      { return "ASW"; }
+    if d.contains("capcom")                           { return "CAP"; }
+    if d.contains("netherrealm")                      { return "NRS"; }
+    if d.contains("snk")                              { return "SNK"; }
+    if d.contains("bandai")                           { return "BNE"; }
+    if d.contains("sega")                             { return "SEGA"; }
+    if d.contains("koei") || d.contains("tecmo")     { return "KT"; }
+    if d.contains("lab zero") || d.contains("hidden variables") { return "IND"; }
+    ""
+}
+
 pub fn print_table(games: Vec<SteamSpyGame>, live_counts: Vec<Option<u32>>, show_appid: bool) {
     if games.is_empty() {
         println!("No results.");
@@ -44,14 +68,20 @@ pub fn print_table(games: Vec<SteamSpyGame>, live_counts: Vec<Option<u32>>, show
     let mut builder = Builder::default();
 
     if show_appid {
-        builder.push_record([" # ", "Game", "Live Players", "Peak CCU", "Developer", "App ID"]);
+        builder.push_record([" # ", "Game", "Players Now", "Peak 24h", "Developer", "App ID"]);
     } else {
-        builder.push_record([" # ", "Game", "Live Players", "Peak CCU", "Developer"]);
+        builder.push_record([" # ", "Game", "Players Now", "Peak 24h", "Developer"]);
     }
 
     for (i, (g, &live)) in games.iter().zip(live_counts.iter()).enumerate() {
-        let rank   = format!("{}", i + 1);
-        let name   = truncate(&g.name, max_name);
+        let rank   = color_rank(i + 1);
+        let tag    = publisher_tag(&g.developer);
+        let name   = if tag.is_empty() {
+            truncate(&g.name, max_name)
+        } else {
+            let max_base = max_name.saturating_sub(tag.len() + 3);
+            format!("{} {}", truncate(&g.name, max_base), format!("[{tag}]").dimmed())
+        };
         let live_s = color_live(live);
         let ccu_s  = if g.ccu == 0 { "—".dimmed().to_string() } else { format_number(g.ccu) };
         let dev    = truncate(&g.developer, max_dev);
@@ -76,8 +106,11 @@ pub fn print_table(games: Vec<SteamSpyGame>, live_counts: Vec<Option<u32>>, show
 
     println!("{table}");
     println!(
-        "  {} game(s) — Live = current players now  |  Peak CCU = peak yesterday (SteamSpy)",
-        games.len()
+        "  {} game(s)  ·  {} 1,000+   {} 100–999   {} <100   · tags: publisher studio",
+        games.len(),
+        "■".green().bold(),
+        "■".yellow(),
+        "■".dimmed(),
     );
 }
 
@@ -128,5 +161,13 @@ pub fn print_json(games: Vec<crate::steamspy::SteamSpyGame>, live_counts: Vec<Op
     println!("{}", serde_json::to_string_pretty(&entries).unwrap_or_default());
 }
 
-
+pub fn print_csv(games: Vec<crate::steamspy::SteamSpyGame>, live_counts: Vec<Option<u32>>) {
+    println!("rank,appid,name,developer,live_players,peak_ccu");
+    for (i, (g, live)) in games.iter().zip(live_counts.iter()).enumerate() {
+        let live_s = live.map(|n| n.to_string()).unwrap_or_default();
+        let name_escaped = g.name.replace('"', "\"\"");
+        let dev_escaped  = g.developer.replace('"', "\"\"");
+        println!("{},{},\"{}\",\"{}\",{},{}", i + 1, g.appid, name_escaped, dev_escaped, live_s, g.ccu);
+    }
+}
 

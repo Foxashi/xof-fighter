@@ -27,6 +27,8 @@ enum OutputFormat {
     Table,
     /// JSON array
     Json,
+    /// CSV (comma-separated values)
+    Csv,
 }
 
 #[derive(Parser)]
@@ -67,6 +69,22 @@ struct Cli {
     /// SteamSpy tag to query
     #[arg(long, value_name = "TAG", default_value = "Fighting")]
     tag: String,
+
+    /// Skip fetching live player counts from Steam (faster, offline-friendly)
+    #[arg(long)]
+    no_live: bool,
+
+    /// Bypass the SteamSpy disk cache and force a fresh fetch
+    #[arg(long)]
+    refresh: bool,
+
+    /// Only show games with at least N peak CCU (SteamSpy)
+    #[arg(long, value_name = "N")]
+    min_ccu: Option<u32>,
+
+    /// Only show games with at least N live players (no effect with --no-live)
+    #[arg(long, value_name = "N")]
+    min_live: Option<u32>,
 }
 
 #[tokio::main]
@@ -90,7 +108,7 @@ async fn main() -> Result<()> {
     pb.enable_steady_tick(Duration::from_millis(80));
     pb.set_message(format!("Fetching {} games from SteamSpy (page 1–{})...", cli.tag, cli.pages));
 
-    let mut games = steamspy::fetch_fighting_games(&client, cli.pages, &cli.tag).await?;
+    let mut games = steamspy::fetch_fighting_games(&client, cli.pages, &cli.tag, cli.refresh).await?;
 
     // Only apply the curated allowlist for the default Fighting tag
     if cli.tag.eq_ignore_ascii_case("fighting") {
@@ -104,36 +122,65 @@ async fn main() -> Result<()> {
         games.retain(|g| g.name.to_lowercase().contains(&f));
     }
 
+    // Apply minimum peak CCU filter
+    if let Some(min) = cli.min_ccu {
+        games.retain(|g| g.ccu >= min);
+    }
+
     if games.is_empty() {
         pb.finish_and_clear();
         eprintln!("No games matched the given filters.");
         return Ok(());
     }
 
-    pb.set_message(format!("Fetching live player counts for {} games...", games.len()));
+    let live = if cli.no_live {
+        vec![None; games.len()]
+    } else {
+        pb.set_style(
+            ProgressStyle::with_template("{spinner:.cyan} [{bar:30.cyan/blue}] {pos}/{len} live counts fetched")
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        pb.set_length(games.len() as u64);
+        pb.set_position(0);
 
-    let sem = Arc::new(Semaphore::new(8));
-    let mut set = tokio::task::JoinSet::new();
-    for (i, game) in games.iter().enumerate() {
-        let client = client.clone();
-        let app_id = game.appid;
-        let permit = Arc::clone(&sem);
-        set.spawn(async move {
-            let _permit = permit.acquire_owned().await;
-            (i, steam::fetch_player_count(&client, app_id).await)
-        });
-    }
-
-    let mut live: Vec<Option<u32>> = vec![None; games.len()];
-    while let Some(res) = set.join_next().await {
-        if let Ok((i, Ok(count))) = res {
-            live[i] = count;
+        let sem = Arc::new(Semaphore::new(8));
+        let mut set = tokio::task::JoinSet::new();
+        for (i, game) in games.iter().enumerate() {
+            let client = client.clone();
+            let app_id = game.appid;
+            let permit = Arc::clone(&sem);
+            set.spawn(async move {
+                let _permit = permit.acquire_owned().await;
+                (i, steam::fetch_player_count(&client, app_id).await)
+            });
         }
-    }
+
+        let mut counts: Vec<Option<u32>> = vec![None; games.len()];
+        while let Some(res) = set.join_next().await {
+            if let Ok((i, Ok(count))) = res {
+                counts[i] = count;
+            }
+            pb.inc(1);
+        }
+        counts
+    };
 
     // Sort combined entries
     let mut entries: Vec<(steamspy::SteamSpyGame, Option<u32>)> =
         games.into_iter().zip(live).collect();
+
+    // Apply live player count filter
+    if let Some(min) = cli.min_live {
+        entries.retain(|(_, live)| live.unwrap_or(0) >= min);
+    }
+
+    if entries.is_empty() {
+        pb.finish_and_clear();
+        eprintln!("No games matched the given filters.");
+        return Ok(());
+    }
+
     match cli.sort {
         SortBy::Live => entries.sort_by(|a, b| b.1.unwrap_or(0).cmp(&a.1.unwrap_or(0))),
         SortBy::Ccu  => entries.sort_by(|a, b| b.0.ccu.cmp(&a.0.ccu)),
@@ -151,6 +198,7 @@ async fn main() -> Result<()> {
     match cli.output {
         OutputFormat::Table => display::print_table(games, live, cli.appid),
         OutputFormat::Json  => display::print_json(games, live),
+        OutputFormat::Csv   => display::print_csv(games, live),
     }
 
     Ok(())
